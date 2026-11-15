@@ -1,6 +1,6 @@
 # HPC Cloud Service Worker
 
-Worker relawan menggunakan CPU perangkat Anda untuk menjalankan tugas dari koordinator HPC Cloud Service. Portal di repositori [hpc-cloudservice](https://github.com/ChanceClover/hpc-cloudservice) menangani registrasi relawan dan penerbitan token.
+Worker relawan menggunakan CPU perangkat Anda untuk menjalankan tugas dari koordinator HPC Cloud Service. Portal di repositori [hpc-cloudservice](https://github.com/NoelianGH/hpc-cloudservice) menangani registrasi relawan dan penerbitan token.
 
 ## Menjalankan worker
 
@@ -33,3 +33,36 @@ Worker relawan menggunakan CPU perangkat Anda untuk menjalankan tugas dari koord
 Worker mengirim token sebagai `Authorization: Bearer <token>` dan mendapat identitas worker dari `/api/register`. Setelah itu worker mengambil tugas melalui `/api/tasks/claim`, memperpanjang waktu pengerjaan melalui `/api/heartbeat`, dan mengirim hasil ke `/api/tasks/submit`. Beban kerja yang tersedia adalah Monte Carlo π dan Mandelbrot.
 
 Kontainer berjalan sebagai pengguna non-root dengan filesystem read-only serta batas bawaan 1 CPU, 512 MB memori, dan 64 proses. Worker hanya memerlukan koneksi keluar ke koordinator.
+
+## Untuk developer relawan (jobdesk)
+
+Repo ini adalah **repo B** HPC Cloud Service: kode yang dikembangkan relawan lewat jobdesk.
+
+1. Jobdesk di-assign otomatis oleh sistem (FIFO) saat compute node Anda online. Lihat jobdesk dan
+   perintah git-nya di dashboard relawan.
+2. Kerjakan di branch jobdesk Anda, bukan di `main`:
+
+   ```bash
+   git fetch origin
+   git switch task/<id>-<judul>
+   # ubah kode, lalu
+   python3 -m unittest discover -s tests -t .
+   git add -A && git commit -m "..." && git push
+   ```
+
+3. Setiap push otomatis di-build dan dites terdistribusi di compute node relawan (CI). Hasilnya muncul
+   di dashboard dan sebagai centang/silang di commit GitHub.
+4. Setelah CI lulus, tekan **AJUKAN REVIEW** di dashboard. Sistem membuka Pull Request; admin meninjau
+   lalu menyetujui (PR di-merge ke `main`) atau meminta revisi.
+
+Pakai email akun GitHub Anda untuk commit (`git config user.email`), karena sistem memeriksa bahwa
+commit di branch jobdesk berasal dari pemilik jobdesk itu.
+
+### File CI
+
+- `hpc.json`: perintah build (`python3 -m py_compile worker.py`) dan test. Setiap file
+  `tests/test_*.py` menjadi satu tugas test yang dijalankan compute node secara paralel.
+- `tests/`: unit test. Tambahkan test baru sebagai file `tests/test_<nama>.py`. Test harus
+  deterministik (tanpa jaringan atau waktu acak), karena tiap tugas dijalankan 2 compute node dan
+  hasilnya harus sama.
+

@@ -1,0 +1,3 @@
+# Semua file teks disimpan dengan akhir baris LF (Linux) di repo, walau di-clone di Windows.
+# Tanpa ini, clone dari Windows membuat semua file terlihat "berubah" (CRLF) dan skrip di kontainer bisa gagal.
+* text=auto eol=lf
