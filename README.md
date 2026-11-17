@@ -2,37 +2,56 @@
 
 Worker relawan menggunakan CPU perangkat Anda untuk menjalankan tugas dari koordinator HPC Cloud Service. Portal di repositori [hpc-cloudservice](https://github.com/NoelianGH/hpc-cloudservice) menangani registrasi relawan dan penerbitan token.
 
-## Menjalankan worker
+## Menjalankan worker (compute node)
 
-1. Siapkan Docker dengan Docker Compose. Di Windows, jalankan Docker Desktop dengan integrasi Ubuntu WSL2.
-2. Daftar di halaman registrasi portal HPC Cloud Service yang disediakan tim. Selesaikan verifikasi OTP lalu salin token worker yang diterbitkan koordinator.
-3. Dari folder repo worker, buat file konfigurasi lokal.
+Repo ini berisi worker relawan sekaligus kode yang Anda kerjakan lewat jobdesk. Worker dijalankan dari
+folder repo ini dengan `./hpc.sh`. Repo platform ([hpc-cloudservice](https://github.com/NoelianGH/hpc-cloudservice))
+tidak perlu di-clone relawan.
 
-   ```bash
-   cp .env.example .env
-   ```
+Ada dua kredensial dengan kegunaan berbeda:
 
-4. Isi `COORDINATOR_URL` dengan alamat HTTPS API koordinator yang diberikan tim. Tempel token individual ke `WORKER_TOKEN` dan isi `WORKER_NAME` dengan nama perangkat. Simpan token di `.env` lokal.
-5. Bangun dan jalankan worker, lalu lihat lognya.
+| Kredensial | Dipakai untuk | Disimpan di |
+| --- | --- | --- |
+| Email + password | Login website (dashboard, jobdesk, sertifikat) | Browser (sesi 7 hari) |
+| Token worker `hpc_w_...` | Worker di terminal: ambil tugas, kirim hasil | File `.env` repo ini |
 
-   ```bash
-   docker compose up --build -d
-   docker compose logs -f worker
-   ```
-
-   Log akan menampilkan identitas worker setelah terdaftar. Setelah koordinator menyediakan tugas dan menerima hasilnya, log akan menampilkan pesan tugas selesai. Jika registrasi gagal, cek alamat koordinator dan pastikan token berasal dari verifikasi OTP yang berhasil.
-
-6. Hentikan worker saat ingin berhenti menyumbangkan CPU.
+1. Siapkan Ubuntu WSL2 dan Docker Desktop (Settings > Resources > WSL Integration: aktifkan Ubuntu).
+2. Register di website portal, lalu verifikasi OTP. Setelah itu dashboard menampilkan perintah setup
+   yang sudah berisi alamat koordinator dan token worker Anda (kartu "Jalankan Worker Anda").
+3. Clone repo ini dan jalankan setup (token diperiksa ke koordinator sebelum disimpan):
 
    ```bash
-   docker compose down
+   git clone https://github.com/ChanceClover/hpc-cloudservice-worker.git ~/hpc-cloudservice-worker
+   cd ~/hpc-cloudservice-worker && chmod +x hpc.sh
+   ./hpc.sh setup <COORDINATOR_URL> <WORKER_TOKEN>
    ```
+
+   Tanpa argumen, `./hpc.sh setup` akan menanyakan alamat dan token. Satu laptop dengan head node?
+   Pakai `http://host.docker.internal:8000` sebagai alamat.
+
+4. Nyalakan worker dan pantau tugasnya:
+
+   ```bash
+   ./hpc.sh up        # 1 worker sandbox (1 CPU, 512 MB); ./hpc.sh up 2 untuk 2 worker
+   ./hpc.sh logs      # Ctrl+C untuk keluar dari log, worker tetap jalan
+   ./hpc.sh status    # cek token + kontainer
+   ./hpc.sh down      # berhenti menyumbang CPU
+   ```
+
+Lupa token, atau token dicabut admin? Buka dashboard, kartu "Token Worker untuk CLI": tampilkan atau buat
+token baru, lalu ulangi `./hpc.sh setup` dan `./hpc.sh up`.
 
 ## Integrasi dengan koordinator
 
-Worker mengirim token sebagai `Authorization: Bearer <token>` dan mendapat identitas worker dari `/api/register`. Setelah itu worker mengambil tugas melalui `/api/tasks/claim`, memperpanjang waktu pengerjaan melalui `/api/heartbeat`, dan mengirim hasil ke `/api/tasks/submit`. Beban kerja yang tersedia adalah Monte Carlo π dan Mandelbrot.
+Worker mengirim token sebagai `Authorization: Bearer <token>` dan mendapat identitas worker dari `/api/register`.
+Setelah itu worker mengambil tugas melalui `/api/tasks/claim` (FIFO), memperpanjang waktu pengerjaan melalui
+`/api/heartbeat`, dan mengirim hasil ke `/api/tasks/submit`. Jenis tugas: Monte Carlo π, Mandelbrot, simulasi
+panas 2D multi-tahap (`heat2d`), program dari repo job pada commit SHA tertentu, serta build/test CI
+terdistribusi (`ci_build`, `ci_test`) untuk setiap push ke repo ini.
 
-Kontainer berjalan sebagai pengguna non-root dengan filesystem read-only serta batas bawaan 1 CPU, 512 MB memori, dan 64 proses. Worker hanya memerlukan koneksi keluar ke koordinator.
+Kontainer berjalan sebagai pengguna non-root dengan filesystem read-only serta batas bawaan 1 CPU, 512 MB
+memori, dan 64 proses. Kode yang diminta tugas di-clone ke `/tmp` (RAM, hilang saat kontainer mati). Worker
+hanya memerlukan koneksi keluar ke koordinator dan GitHub.
 
 ## Untuk developer relawan (jobdesk)
 
@@ -46,7 +65,7 @@ Repo ini adalah **repo B** HPC Cloud Service: kode yang dikembangkan relawan lew
    git fetch origin
    git switch task/<id>-<judul>
    # ubah kode, lalu
-   python3 -m unittest discover -s tests -t .
+   ./hpc.sh test
    git add -A && git commit -m "..." && git push
    ```
 

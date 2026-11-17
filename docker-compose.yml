@@ -1,21 +1,28 @@
 # Worker relawan di dalam sandbox: non-root, read-only, tanpa capability,
 # tanpa akses folder host / docker.sock, dibatasi CPU, RAM, dan jumlah proses.
+# Kode yang diminta tugas (repo job / repo proyek untuk CI) di-clone ke /tmp (tmpfs di RAM).
+# Jalankan lewat ./hpc.sh up (bukan docker compose langsung) agar .env diperiksa dulu.
 services:
   worker:
     build: .
-    image: hpc-worker
+    image: hpc-worker-relawan
     restart: unless-stopped
     environment:
-      COORDINATOR_URL: ${COORDINATOR_URL:?Isi COORDINATOR_URL di .env}
-      WORKER_TOKEN: ${WORKER_TOKEN:?Isi WORKER_TOKEN di .env}
+      COORDINATOR_URL: ${COORDINATOR_URL:?Isi COORDINATOR_URL di .env (./hpc.sh setup)}
+      WORKER_TOKEN: ${WORKER_TOKEN:?Isi WORKER_TOKEN di .env (./hpc.sh setup)}
       WORKER_NAME: ${WORKER_NAME:-worker}
+      # Kapasitas sandbox dilaporkan ke koordinator (sama dengan cpus/mem_limit di bawah)
+      WORKER_CPUS: ${WORKER_CPUS:-1}
+      WORKER_MEMORY_MB: ${WORKER_MEMORY_MB:-512}
+      # Worker hanya mau clone repo dengan awalan ini
+      ALLOWED_REPO_PREFIXES: ${ALLOWED_REPO_PREFIXES:-https://github.com/}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     read_only: true
     tmpfs:
-      - /tmp:size=16m
+      - /tmp:size=128m
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     pids_limit: 64
-    mem_limit: 512m
-    cpus: 1
+    mem_limit: ${WORKER_MEMORY_MB:-512}m
+    cpus: ${WORKER_CPUS:-1}

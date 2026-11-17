@@ -36,10 +36,11 @@ class TestKoordinator(unittest.TestCase):
     def test_register_kembalikan_worker_id(self):
         with mock.patch.object(worker, "call", return_value={"worker_id": "abc"}) as c:
             self.assertEqual(worker.register(), "abc")
-        c.assert_called_once_with("/api/register", {"name": worker.NAME})
+        c.assert_called_once_with("/api/register", {"name": worker.NAME, "capacity": worker.CAPACITY})
 
     def test_jenis_tugas_terdaftar(self):
-        self.assertEqual(set(worker.KINDS), {"montecarlo_pi", "mandelbrot"})
+        self.assertEqual(set(worker.KINDS), {"montecarlo_pi", "mandelbrot", "heat2d"})
+        self.assertEqual(set(worker.CI_KINDS), {"ci_build", "ci_test"})
 
 
 if __name__ == "__main__":
